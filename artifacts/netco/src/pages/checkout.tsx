@@ -37,15 +37,16 @@ export default function Checkout() {
   const [phone, setPhone] = useState("");
   const [orderId, setOrderId] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
+  const [checkoutRequestId, setCheckoutRequestId] = useState("");
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
-  const [pollCount, setPollCount] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const createOrder = useCreateOrder();
   const initiatePayment = useInitiatePayment();
+  const pollKey = checkoutRequestId || paymentRef;
   const { data: paymentStatus } = useCheckPaymentStatus(
-    paymentRef,
-    { query: { enabled: !!paymentRef && paymentState === "polling", queryKey: getCheckPaymentStatusQueryKey(paymentRef), refetchInterval: 5000 } }
+    pollKey,
+    { query: { enabled: !!pollKey && paymentState === "polling", queryKey: getCheckPaymentStatusQueryKey(pollKey), refetchInterval: 5000 } }
   );
 
   useEffect(() => {
@@ -130,6 +131,7 @@ export default function Checkout() {
       });
 
       setPaymentRef(payRes.reference);
+      if (payRes.checkoutRequestId) setCheckoutRequestId(payRes.checkoutRequestId);
       setPaymentState("polling");
     } catch {
       setPaymentState("error");

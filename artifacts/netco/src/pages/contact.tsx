@@ -22,9 +22,9 @@ const contactSchema = z.object({
 type ContactForm = z.infer<typeof contactSchema>;
 
 const CONTACT_ITEMS = [
-  { icon: MessageSquare, label: "WhatsApp", value: "+254 700 000 000", href: "https://wa.me/254700000000", color: "text-green-400", bg: "bg-green-400/10 border-green-400/20" },
-  { icon: MessageSquare, label: "Telegram", value: "@netco_support", href: "https://t.me/netco_support", color: "text-blue-400", bg: "bg-blue-400/10 border-blue-400/20" },
-  { icon: Mail, label: "Email", value: "support@netco.ke", href: "mailto:support@netco.ke", color: "text-primary", bg: "bg-primary/10 border-primary/20" },
+  { icon: MessageSquare, label: "WhatsApp", value: "+254 782 829 321", href: "https://wa.me/254782829321", color: "text-green-400", bg: "bg-green-400/10 border-green-400/20" },
+  { icon: MessageSquare, label: "Telegram", value: "@netco", href: "https://t.me/netco", color: "text-blue-400", bg: "bg-blue-400/10 border-blue-400/20" },
+  { icon: Mail, label: "Email", value: "netco@anonymiketech.online", href: "mailto:netco@anonymiketech.online", color: "text-primary", bg: "bg-primary/10 border-primary/20" },
   { icon: Clock, label: "Support Hours", value: "24/7 — Always Available", href: null, color: "text-secondary", bg: "bg-secondary/10 border-secondary/20" },
 ];
 

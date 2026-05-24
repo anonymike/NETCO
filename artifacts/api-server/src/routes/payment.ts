@@ -6,7 +6,26 @@ import { InitiatePaymentBody } from "@workspace/api-zod";
 
 const router = Router();
 
-const paymentStore = new Map<string, { status: string; completedAt?: string; message?: string }>();
+const PAYFLOW_BASE = "https://payflow.top/api/v2";
+const PAYFLOW_API_KEY = process.env.PAYFLOW_API_KEY ?? "";
+const PAYFLOW_API_SECRET = process.env.PAYFLOW_API_SECRET ?? "";
+const PAYFLOW_ACCOUNT_ID = Number(process.env.PAYFLOW_ACCOUNT_ID ?? "0");
+
+function payflowHeaders() {
+  return {
+    "X-API-Key": PAYFLOW_API_KEY,
+    "X-API-Secret": PAYFLOW_API_SECRET,
+    "Content-Type": "application/json",
+  };
+}
+
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("0") && digits.length === 10) return `254${digits.slice(1)}`;
+  if (digits.startsWith("254") && digits.length === 12) return digits;
+  if (digits.startsWith("7") && digits.length === 9) return `254${digits}`;
+  return digits;
+}
 
 router.post("/initiate", async (req, res) => {
   const parsed = InitiatePaymentBody.safeParse(req.body);
@@ -16,50 +35,131 @@ router.post("/initiate", async (req, res) => {
   }
 
   const { phone, amount, orderId } = parsed.data;
-  const reference = `PAY-${randomUUID().slice(0, 8).toUpperCase()}`;
+  const reference = `NETCO-${randomUUID().slice(0, 8).toUpperCase()}`;
+  const phoneFormatted = normalizePhone(phone);
 
-  paymentStore.set(reference, { status: "pending" });
+  req.log.info({ phone: phoneFormatted, amount, orderId, reference }, "Initiating PayFlow STK push");
 
-  setTimeout(() => {
-    const record = paymentStore.get(reference);
-    if (record && record.status === "pending") {
-      paymentStore.set(reference, {
-        status: "completed",
-        completedAt: new Date().toISOString(),
-        message: "Payment confirmed",
+  try {
+    const body = {
+      payment_account_id: PAYFLOW_ACCOUNT_ID,
+      phone: phoneFormatted,
+      amount: Number(amount),
+      reference,
+      description: `NETCO VPN Config — Order ${orderId}`,
+    };
+
+    const pfRes = await fetch(`${PAYFLOW_BASE}/stkpush.php`, {
+      method: "POST",
+      headers: payflowHeaders(),
+      body: JSON.stringify(body),
+    });
+
+    const pfData = (await pfRes.json()) as {
+      success: boolean;
+      message?: string;
+      checkout_request_id?: string;
+      data?: { checkout_request_id?: string };
+    };
+
+    req.log.info({ pfData, status: pfRes.status }, "PayFlow STK response");
+
+    if (!pfRes.ok || !pfData.success) {
+      res.status(502).json({
+        error: "Payment gateway error",
+        message: pfData.message ?? "STK Push failed. Please try again.",
       });
-      db.update(ordersTable)
-        .set({ status: "completed", paymentReference: reference })
-        .where(eq(ordersTable.id, orderId))
-        .execute()
-        .catch(() => {});
+      return;
     }
-  }, 15000);
 
-  req.log.info({ phone, amount, orderId, reference }, "Payment initiated");
+    const checkoutRequestId =
+      pfData.checkout_request_id ?? pfData.data?.checkout_request_id ?? `WS_CO_${Date.now()}`;
 
-  res.json({
-    success: true,
-    reference,
-    message: `STK Push sent to ${phone}. Please enter your M-Pesa PIN.`,
-    checkoutRequestId: `WS_CO_${Date.now()}`,
-  });
+    await db
+      .update(ordersTable)
+      .set({ paymentReference: reference, status: "pending" })
+      .where(eq(ordersTable.id, orderId));
+
+    res.json({
+      success: true,
+      reference,
+      checkoutRequestId,
+      message: `M-Pesa STK Push sent to ${phone}. Enter your PIN on your phone.`,
+    });
+  } catch (err) {
+    req.log.error({ err }, "PayFlow request failed");
+    res.status(503).json({ error: "Payment service unreachable. Please try again shortly." });
+  }
 });
 
-router.get("/status/:reference", (req, res) => {
-  const record = paymentStore.get(req.params.reference);
+router.get("/status/:reference", async (req, res) => {
+  const { reference } = req.params;
 
-  if (!record) {
-    res.status(404).json({ error: "Payment reference not found" });
-    return;
+  try {
+    const pfRes = await fetch(`${PAYFLOW_BASE}/status.php`, {
+      method: "POST",
+      headers: payflowHeaders(),
+      body: JSON.stringify({ checkout_request_id: reference }),
+    });
+
+    const pfData = (await pfRes.json()) as {
+      success: boolean;
+      message?: string;
+      status?: string;
+      data?: {
+        status?: string;
+        transaction_code?: string;
+        amount?: number;
+        completed_at?: string;
+      };
+    };
+
+    req.log.info({ pfData, reference }, "PayFlow status check");
+
+    if (!pfRes.ok || !pfData.success) {
+      res.json({ reference, status: "pending", message: pfData.message ?? null, completedAt: null });
+      return;
+    }
+
+    const rawStatus = (pfData.data?.status ?? pfData.status ?? "pending").toLowerCase();
+
+    let mappedStatus: "pending" | "completed" | "failed" | "cancelled";
+    if (rawStatus === "completed" || rawStatus === "success") {
+      mappedStatus = "completed";
+    } else if (rawStatus === "failed" || rawStatus === "error") {
+      mappedStatus = "failed";
+    } else if (rawStatus === "cancelled") {
+      mappedStatus = "cancelled";
+    } else {
+      mappedStatus = "pending";
+    }
+
+    if (mappedStatus === "completed") {
+      const [order] = await db
+        .select()
+        .from(ordersTable)
+        .where(eq(ordersTable.paymentReference, reference))
+        .limit(1);
+
+      if (order && order.status !== "completed") {
+        await db
+          .update(ordersTable)
+          .set({ status: "completed" })
+          .where(eq(ordersTable.id, order.id));
+      }
+    }
+
+    res.json({
+      reference,
+      status: mappedStatus,
+      message: pfData.message ?? null,
+      completedAt: pfData.data?.completed_at ?? null,
+      transactionCode: pfData.data?.transaction_code ?? null,
+    });
+  } catch (err) {
+    req.log.error({ err, reference }, "PayFlow status check failed");
+    res.json({ reference, status: "pending", message: null, completedAt: null });
   }
-
-  res.json({
-    reference: req.params.reference,
-    status: record.status,
-    message: record.message ?? null,
-    completedAt: record.completedAt ?? null,
-  });
 });
 
 export default router;
