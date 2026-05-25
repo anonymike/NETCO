@@ -130,9 +130,20 @@ export default function Checkout() {
         },
       });
 
-      setPaymentRef(payRes.reference);
+      const ref = payRes.reference;
+      setPaymentRef(ref);
       if (payRes.checkoutRequestId) setCheckoutRequestId(payRes.checkoutRequestId);
       setPaymentState("polling");
+
+      sessionStorage.setItem("netco_pending_order", JSON.stringify({
+        ref,
+        orderId: orderRes.id,
+        phone: phone.trim(),
+        appType,
+        deviceId: deviceId.trim(),
+        amount: String(amount ?? 0),
+      }));
+      navigate(`/order-status`);
     } catch {
       setPaymentState("error");
       toast({ title: "Payment failed", description: "Could not initiate payment. Please try again.", variant: "destructive" });

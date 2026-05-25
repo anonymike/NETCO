@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Shield, Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Shield, Loader2, Eye, EyeOff, CheckCircle, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 export default function Signup() {
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -18,13 +20,27 @@ export default function Signup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim() || !password.trim()) {
+    if (!name.trim() || !email.trim() || !password.trim()) {
       toast({ title: "Fill in required fields", variant: "destructive" });
       return;
     }
+    if (password.length < 8) {
+      toast({ title: "Password too short", description: "Use at least 8 characters.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: { full_name: name.trim(), phone: phone.trim() },
+      },
+    });
     setLoading(false);
+    if (error) {
+      toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+      return;
+    }
     setDone(true);
   };
 
@@ -32,11 +48,19 @@ export default function Signup() {
     return (
       <div className="min-h-screen pt-16 pb-20 px-4 flex items-center justify-center">
         <div className="glass-card rounded-xl p-10 max-w-md w-full text-center space-y-5" data-testid="signup-success">
-          <CheckCircle className="w-16 h-16 text-success mx-auto" />
-          <h2 className="text-2xl font-heading font-bold">Account Created!</h2>
-          <p className="text-muted-foreground text-sm">Account login will be fully enabled soon. In the meantime, you can purchase configs directly — no account required.</p>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 border border-primary/30 mx-auto">
+            <Mail className="w-8 h-8 text-primary" />
+          </div>
+          <h2 className="text-2xl font-heading font-bold">Check Your Email</h2>
+          <p className="text-muted-foreground text-sm">
+            We sent a confirmation link to <strong className="text-foreground">{email}</strong>.
+            Click it to activate your account, then sign in.
+          </p>
+          <Button onClick={() => navigate("/login")} className="bg-primary text-primary-foreground w-full glow-primary-hover">
+            Go to Login
+          </Button>
           <Link href="/pricing">
-            <Button className="bg-primary text-primary-foreground w-full glow-primary-hover">Browse Plans</Button>
+            <Button variant="outline" className="w-full border-border mt-2">Browse Plans First</Button>
           </Link>
         </div>
       </div>
@@ -58,17 +82,40 @@ export default function Signup() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name <span className="text-destructive">*</span></Label>
-              <Input id="name" placeholder="John Mwangi" value={name} onChange={(e) => setName(e.target.value)} className="bg-card border-border focus:border-primary h-11" data-testid="input-name" />
+              <Input
+                id="name"
+                placeholder="John Mwangi"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="bg-card border-border focus:border-primary h-11"
+                data-testid="input-name"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number <span className="text-destructive">*</span></Label>
-              <Input id="phone" type="tel" placeholder="0712345678" value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-card border-border focus:border-primary h-11" data-testid="input-phone" />
+              <Label htmlFor="email">Email Address <span className="text-destructive">*</span></Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-card border-border focus:border-primary h-11"
+                data-testid="input-email"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address <span className="text-muted-foreground text-xs">(optional)</span></Label>
-              <Input id="email" type="email" placeholder="john@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-card border-border focus:border-primary h-11" data-testid="input-email" />
+              <Label htmlFor="phone">Phone Number <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="0712345678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="bg-card border-border focus:border-primary h-11"
+                data-testid="input-phone"
+              />
             </div>
 
             <div className="space-y-2">
@@ -83,7 +130,11 @@ export default function Signup() {
                   className="bg-card border-border focus:border-primary h-11 pr-10"
                   data-testid="input-password"
                 />
-                <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -94,8 +145,13 @@ export default function Signup() {
               <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>.
             </p>
 
-            <Button type="submit" disabled={loading} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-primary-hover h-11" data-testid="button-signup">
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating Account...</> : "Create Account"}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-primary-hover h-11"
+              data-testid="button-signup"
+            >
+              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating Account…</> : "Create Account"}
             </Button>
           </form>
         </div>

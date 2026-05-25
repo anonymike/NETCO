@@ -1,22 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, X, Shield } from "lucide-react";
+import { Menu, X, Shield, LogOut, User, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [location] = useLocation();
+  const { user, isAdminUser, signOut, loading } = useAuth();
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
@@ -68,17 +67,48 @@ export function Navbar() {
           </nav>
 
           {/* Auth Buttons (Desktop) */}
-          <div className="hidden md:flex items-center gap-3">
-            <Link href="/login" data-testid="link-login">
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                Login
-              </Button>
-            </Link>
-            <Link href="/signup" data-testid="link-signup">
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary-hover border border-primary/50">
-                Sign Up
-              </Button>
-            </Link>
+          <div className="hidden md:flex items-center gap-2">
+            {loading ? null : user ? (
+              <>
+                {isAdminUser && (
+                  <Link href="/admin" data-testid="link-admin">
+                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary gap-1.5">
+                      <LayoutDashboard className="w-4 h-4" />
+                      Admin
+                    </Button>
+                  </Link>
+                )}
+                <Link href="/dashboard" data-testid="link-my-plans">
+                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground gap-1.5">
+                    <User className="w-4 h-4" />
+                    My Plans
+                  </Button>
+                </Link>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={signOut}
+                  className="border-border text-muted-foreground hover:text-foreground gap-1.5"
+                  data-testid="button-signout"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" data-testid="link-login">
+                  <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                    Login
+                  </Button>
+                </Link>
+                <Link href="/signup" data-testid="link-signup">
+                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary-hover border border-primary/50">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -109,18 +139,39 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <div className="grid grid-cols-2 gap-3 pt-4 mt-2 border-t border-border">
-              <Link href="/login">
-                <Button variant="outline" className="w-full border-border">
-                  Login
-                </Button>
-              </Link>
-              <Link href="/signup">
-                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-primary">
-                  Sign Up
-                </Button>
-              </Link>
-            </div>
+
+            {!loading && (
+              <div className="pt-4 mt-2 border-t border-border space-y-2">
+                {user ? (
+                  <>
+                    {isAdminUser && (
+                      <Link href="/admin">
+                        <Button variant="outline" className="w-full border-border gap-2">
+                          <LayoutDashboard className="w-4 h-4" /> Admin Panel
+                        </Button>
+                      </Link>
+                    )}
+                    <Link href="/dashboard">
+                      <Button variant="outline" className="w-full border-border gap-2">
+                        <User className="w-4 h-4" /> My Plans
+                      </Button>
+                    </Link>
+                    <Button onClick={signOut} variant="ghost" className="w-full text-muted-foreground gap-2">
+                      <LogOut className="w-4 h-4" /> Sign Out
+                    </Button>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Link href="/login">
+                      <Button variant="outline" className="w-full border-border">Login</Button>
+                    </Link>
+                    <Link href="/signup">
+                      <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-primary">Sign Up</Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
