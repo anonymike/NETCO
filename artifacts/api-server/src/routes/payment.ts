@@ -8,6 +8,12 @@ import { downloadConfigFile } from "../lib/storage";
 
 const router = Router();
 
+interface MinimalLogger {
+  info?: (msg: string) => void;
+  warn?: (msg: string) => void;
+  error?: (msg: string) => void;
+}
+
 const PAYFLOW_BASE = "https://payflow.top/api/v2";
 const PAYFLOW_API_KEY = process.env.PAYFLOW_API_KEY ?? "";
 const PAYFLOW_API_SECRET = process.env.PAYFLOW_API_SECRET ?? "";
@@ -37,7 +43,7 @@ function expiryFromDuration(duration: string): Date {
   return now;
 }
 
-async function autoFulfillOrder(orderId: string, logger: typeof console) {
+async function autoFulfillOrder(orderId: string, logger: MinimalLogger) {
   try {
     const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
     if (!order || order.configUrl) return;
@@ -218,7 +224,7 @@ router.get("/status/:reference", async (req, res) => {
 
       if (order) {
         if (order.status !== "completed") {
-          await autoFulfillOrder(order.id, req.log as typeof console);
+          await autoFulfillOrder(order.id, req.log as MinimalLogger);
         }
         const [freshOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, order.id)).limit(1);
         configUrl = freshOrder?.configUrl ?? null;
