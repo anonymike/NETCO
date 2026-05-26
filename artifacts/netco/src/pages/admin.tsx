@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { apiUrl } from "@/lib/api";
 
 const NETWORK_COLORS = ["#00F5FF", "#7B61FF", "#0057A8"];
 const TABS = ["Dashboard", "Orders", "Config Servers"] as const;
@@ -140,7 +141,7 @@ export default function Admin() {
       const params = new URLSearchParams();
       if (orderFilter !== "all") params.set("status", orderFilter);
       if (orderSearch.trim()) params.set("search", orderSearch.trim());
-      const res = await fetch(`/api/admin/orders?${params}`);
+      const res = await fetch(apiUrl(`/api/admin/orders?${params}`));
       const data = await res.json() as Order[];
       setOrders(data);
     } catch {
@@ -184,7 +185,7 @@ export default function Admin() {
     if (!fulfillOrderId) return;
     setFulfilling(true);
     try {
-      const res = await fetch(`/api/admin/orders/${fulfillOrderId}/fulfill`, {
+      const res = await fetch(apiUrl(`/api/admin/orders/${fulfillOrderId}/fulfill`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(fulfillServerId ? { configServerId: fulfillServerId } : {}),
@@ -204,7 +205,7 @@ export default function Admin() {
 
   const handleMarkStatus = async (orderId: string, status: string) => {
     try {
-      const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+      const res = await fetch(apiUrl(`/api/admin/orders/${orderId}/status`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -219,7 +220,7 @@ export default function Admin() {
 
   const handleToggleFree = async (id: string, current: boolean) => {
     try {
-      const res = await fetch(`/api/admin/servers/${id}`, {
+      const res = await fetch(apiUrl(`/api/admin/servers/${id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isFree: !current }),
@@ -262,7 +263,7 @@ export default function Admin() {
       fd.append("planType", form.planType);
       fd.append("duration", form.duration);
       fd.append("configFile", form.file);
-      const res = await fetch("/api/admin/servers", { method: "POST", body: fd });
+      const res = await fetch(apiUrl("/api/admin/servers"), { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json() as { error?: string };
         throw new Error(err.error ?? "Upload failed");
@@ -306,7 +307,7 @@ export default function Admin() {
     try {
       const fd = new FormData();
       fd.append("configFile", replaceFile);
-      const res = await fetch(`/api/admin/servers/${id}/file`, { method: "PUT", body: fd });
+      const res = await fetch(apiUrl(`/api/admin/servers/${id}/file`), { method: "PUT", body: fd });
       if (!res.ok) {
         const err = await res.json() as { error?: string };
         throw new Error(err.error ?? "Replace failed");
@@ -323,7 +324,7 @@ export default function Admin() {
   }
 
   function downloadServer(id: string) {
-    window.open(`/api/admin/servers/${id}/download`, "_blank");
+    window.open(apiUrl(`/api/admin/servers/${id}/download`), "_blank");
   }
 
   const pendingOrders = orders.filter((o) => o.status === "pending").length;

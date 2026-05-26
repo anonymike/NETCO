@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Shield, Loader2, Eye, EyeOff, CheckCircle, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { apiUrl } from "@/lib/api";
 
 export default function Signup() {
   const [, navigate] = useLocation();
@@ -43,7 +44,7 @@ export default function Signup() {
     }
 
     try {
-      await fetch(`${import.meta.env.BASE_URL}api/auth/email/welcome`, {
+      await fetch(apiUrl("api/auth/email/welcome"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim() }),

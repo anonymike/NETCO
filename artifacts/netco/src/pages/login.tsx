@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Shield, Loader2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { apiUrl } from "@/lib/api";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -49,7 +50,7 @@ export default function Login() {
 
     try {
       const resetUrl = `${window.location.origin}/reset-password`;
-      await fetch(`${import.meta.env.BASE_URL}api/auth/email/reset`, {
+      await fetch(apiUrl("api/auth/email/reset"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), resetUrl }),
